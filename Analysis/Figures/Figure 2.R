@@ -1,3 +1,8 @@
+####MPA and Nutrition Project
+####Figure 2
+####Author: Daniel Viana
+####Date: June 2023
+
 library(tidyverse)
 library(readr)
 library(ggpubr)
@@ -82,11 +87,11 @@ fig1 = ggplot(data = reef_MPA_benefits %>% filter(buffer=="10", governance=="Fis
         legend.margin = margin(t = 0.5, r = 0, b = 1, l = 0, "cm"))
 fig1
 
-ggsave(filename = "Figures/Figure2_bayes.jpeg",
+ggsave(filename = "Manuscript figures/Fig 2.jpeg",
        plot = fig1,
        height = 6, 
        width = 11)
 
-ggsave(fig1, filename = "Figures/Figure3_bayes.pdf", 
+ggsave(fig1, filename = "Manuscript figures/Fig 2.pdf", 
        width=11, height=6, units="in", dpi=600, device=cairo_pdf)
 

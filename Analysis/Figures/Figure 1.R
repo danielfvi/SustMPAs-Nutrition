@@ -1,7 +1,7 @@
 ####MPA and Nutrition Project
 ####Figure 1
 ####Author: Daniel Viana
-####Date: June 2021
+####Date: June 2023
 
 library(tidyverse) 
 library(gdata)
@@ -71,7 +71,7 @@ map1 = ggplot() +
         title = element_text(size = 10),
         legend.title = element_text(size=15),
         legend.text = element_text(size = 15),
-        plot.margin = ggplot2::margin(t = 0, r = 0, b = 0, l = 0.04, "cm")) +
+        plot.margin = ggplot2::margin(t = -3, r = 0, b = 0, l = 0.04, "cm")) +
   coord_sf(y=c(-28, 30))
 
 #map1
@@ -116,7 +116,7 @@ map2 = ggplot() +
         title = element_text(size = 10),
         legend.title = element_text(size = 15),
         legend.text = element_text(size = 15),
-        plot.margin = ggplot2::margin(t = -3, r = 0, b = 0, l = 0.04, "cm")) +
+        plot.margin = ggplot2::margin(t = 0, r = 0, b = 0, l = 0.04, "cm")) +
   coord_sf(y=c(-28, 30))
 
 ##Boxplots
@@ -124,23 +124,29 @@ map2 = ggplot() +
 p1 = ggplot(data = RLS_sites_st_OA)+
   geom_boxplot(aes(y = bio_log))+
   labs(y = "")+
+  scale_y_continuous(breaks = c(2, 6, 9),
+                     labels = c("2", "6", "9"))+
   theme_bw()+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank(),
         axis.text.y = element_text(size = 15),
-        plot.margin = ggplot2::margin(t = 1.85, r = 0.1, b = 1.53, l = 0.5, "cm"))
+        #plot.margin = ggplot2::margin(t = 1.85, r = 0.1, b = 1.53, l = 0.7, "cm"),
+        plot.margin = ggplot2::margin(t = 0.35, r = 0.1, b = 3, l = 0.7, "cm"))
 #p1
 
 p2 = ggplot(data = RLS_sites_st_MU)+
   geom_boxplot(aes(y = bio_log))+
   labs(y = "")+
+  scale_y_continuous(breaks = c(2, 6, 9),
+                     labels = c("2", "6", "9"))+
   theme_bw()+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank(),
         axis.text.y = element_text(size = 15),
-        plot.margin = ggplot2::margin(t = 0.35, r = 0.1, b = 3, l = 0.4, "cm"))
+        #plot.margin = ggplot2::margin(t = 0.35, r = 0.1, b = 3, l = 0.7, "cm"),
+        plot.margin = ggplot2::margin(t = 1.85, r = 0.1, b = 1.53, l = 0.7, "cm"))
 
 #p2
 
@@ -158,49 +164,63 @@ p2 = ggplot(data = RLS_sites_st_MU)+
 #         axis.text = element_text(size = 15),
 #         plot.margin = ggplot2::margin(t = 1.9, r = 0, b = 3, l = 0.4, "cm"))
 
-perc_change_OA_MPA <- read_csv("Outputs/predicted_OA_MPA_bayes_perc_change.csv")
+perc_change_OA_MPA <- read_csv("Outputs/predicted_OA_MPA_bayes_perc_change.csv") %>% 
+  mutate(mgm_effect = if_else(mora>0.5, "High FME", "Low FME"))
 
 p3 = ggplot(data = perc_change_OA_MPA) +
-  geom_density(aes(x = pred_change, y = ..scaled..), fill = "deepskyblue") + 
+  geom_density(aes(x = pred_change, y = ..scaled.., fill = mgm_effect), alpha = 0.5) + 
   #labs(x = expression(paste("Change in\nbiomass\nlog (kg ha"^-1,")")), y = "Density") +
-  labs(x = "Difference in\nbiomass (%)", y = "Density") +
+  #facet_wrap(~mgm_effect, ncol = 1) +
+  guides(fill = guide_legend(nrow=2)) +
+  labs(x = "Difference in\nbiomass (%)", y = "Density", fill = "") +
   geom_vline(xintercept = 0, size = 1.2, linetype="dashed") +
   scale_x_continuous(breaks = c(0, 15, 30), labels = c("0","15", "30"))+
   scale_y_continuous(breaks = c(0, 0.5, 1), labels = c("0.0", "0.5", "1.0")) +
   theme_bw() +
-  theme(axis.title = element_text(size = 15, vjust = 0.8),
+  theme(legend.position = "top",
+        legend.text = element_text(size = 13),
+        axis.title = element_text(size = 15, vjust = 0.8),
         axis.text = element_text(size = 15),
-        plot.margin = ggplot2::margin(t = 1.9, r = 0, b = 3, l = 0.4, "cm"))
+        plot.margin = ggplot2::margin(t = 1.9, r = 0.3, b = 2.5, l = 0.4, "cm"),
+        legend.box.margin = ggplot2::margin(t = 0, r = 0.8, b = -0.3, l = 0.2, "cm"))
+
+p3
+ggplot(data = perc_change_OA_MPA) + 
+  geom_point(aes(y = pred_change, x = mora)) +
+  labs(x = "Fisheries Management Effectiveness",
+       y = "Difference in biomass (%)") +
+  theme_bw()
 
 ##########Figure 1####
-p.final = ggarrange(p1, map1, p2, map2, 
-          ncol=2, 
-          nrow=2,
-          widths = c(0.3, 2), 
-          heights = c(2,2), 
-          labels = c("", "B", "", "C"), 
-          font.label = list(size = 20, color = "black", face = "bold"),
-          label.y = c(0.9, 0.85, 1, 1.1), 
-          label.x = c(-0.01))
+p.final = ggarrange(p2, map2, p1, map1, 
+                    ncol=2, 
+                    nrow=2,
+                    widths = c(0.3, 2), 
+                    heights = c(2,2), 
+                    labels = c("", "A", "", "B"), 
+                    font.label = list(size = 20, color = "black", face = "bold"),
+                    label.y = c(0.9, 0.85, 1, 1.1), 
+                    label.x = c(-0.01))
 
-p.final2 = ggarrange(p3, p.final, 
+p.final2 = ggarrange(p.final, p3,  
                      ncol=2, 
                      nrow=1,
-                     widths = c(0.5, 2), 
+                     widths = c(2, 0.6), 
                      heights = c(2,2), 
-                     labels = c("A", ""), 
+                     labels = c("", "C"), 
                      font.label = list(size = 20, color = "black", face = "bold"),
                      label.y = c(0.91), 
                      label.x = c(0.2))
 
-ggsave(filename = "Figures/Figure1_posterior.pdf", 
-       plot = p.final2,
-       height = 4.5, 
-       width = 8, dpi=600, 
-       device=cairo_pdf)
+p.final2
 
-ggsave(filename = "Figures/Figure1_posterior.jpeg", 
+ggsave(filename = "Figures/Figure1_6_03.jpeg", 
        plot = p.final2,
        height = 4.5, 
        width = 10)
 
+ggsave(filename = "Figures/Figure1_6_03.pdf", 
+       plot = p.final2,
+       height = 4.5, 
+       width = 10, dpi=600, 
+       device=cairo_pdf)

@@ -1,7 +1,7 @@
 ####MPA and Nutrition Project
-####Figure 2
+####Figure 4
 ####Author: Daniel Viana
-####Date: June 2021
+####Date: June 2023
 
 library(tidyverse) 
 library(gdata)
@@ -10,6 +10,7 @@ library(cowplot)
 library(ggnewscale)
 library(ggrepel)
 library(sf)
+library(countrycode)
 
 # Clear workspace
 rm(list = ls())
@@ -46,7 +47,7 @@ world_tiny <- rnaturalearth::ne_countries(type="tiny_countries", returnclass = "
   select(continent, subunit, su_a3) %>% 
   rename(country=subunit, iso3=su_a3) %>% 
   mutate(area_sqkm=10)
-  
+
 # Merge centroids
 world_centers <- bind_rows(world_lg, world_tiny)
 
@@ -82,6 +83,20 @@ impacted_pop <- read_csv("Outputs/impacted_pop_SEV_bayes.csv") %>%
          ndeficient_diff_log = if_else(ndeficient_diff_log<1, 1, ndeficient_diff_log)) %>%
   filter(buffer == 10)
 
+# # Set breaks and labels
+# breaks_list <- list("DHA+EPA"=c(2.3, 4.6, 6.9, 9.2),
+#                     "Vitamin B12"=seq(-2, 0, 0.5),
+#                     "Iron"=seq(-0.5, 0, 0.1),
+#                     "Zinc"=seq(-0.5, 0, 0.1),
+#                     "Calcium"=seq(-0.2, 0, 0.05),
+#                     "Vitamin A, RAE"=seq(-0.1, 0, 0.025))
+# 
+# labels_list <- list("DHA+EPA"=c("10", "100", "1000", "10000"),
+#                     "Vitamin B12"=c("< -2.0", "-1.5", "-1.0", "-0.5", "0"),
+#                     "Iron"=c("< -0.5", "-0.4", "-0.3", "0.2", "0.1", "0"),
+#                     "Zinc"=c("< -0.5", "-0.4", "-0.3", "0.2", "0.1", "0"),
+#                     "Calcium"=c("< -0.20", "-0.15", "-0.10", "0.05", "0"),
+#                     "Vitamin A, RAE"=c("-0.100", "0.075", "0.050", "0.025", "0.000"))
 
 ### per capita seafood consumption
 plot_func = function(nut){
@@ -139,8 +154,8 @@ plot_func = function(nut){
           axis.text = element_blank(),
           axis.title=element_blank(), 
           legend.background = element_rect(fill=alpha('blue', 0)),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 13),
+          legend.text = element_text(size = 11),
           plot.title = element_text(size = 13))
   
   return(p)
@@ -158,10 +173,115 @@ g <- gridExtra::grid.arrange(plot1, plot2,
                              plot3, plot4,
                              plot5, plot6, ncol=2)
 
-# Export
-ggsave(g, filename = "Figures/All_nutrients_bayes_Npeople_brms.pdf", 
-       width=10, height=6.2, units="in", dpi=600, device=cairo_pdf)
+###Add total impacted pop
+sevs = read_csv("data/2017_perc_pop_deficient.csv") %>% 
+  group_by(iso3) %>% 
+  summarise(intake = mean(perc_deficient)) %>% 
+  mutate(is_vulnerable = if_else(intake>25, "Nutritionally vulnerable", "Less vulnerable"))
 
-ggsave(g, filename = "Figures/All_nutrients_bayes_Npeople_brms.jpeg", 
+uncert_run <- read_csv("Outputs/uncert_run6000.csv") %>% 
+  mutate(nutrient = recode(nutrient, 
+                           "Omega-3 fatty acids" = "DHA+EPA",
+                           "Vitamin B-12" = "Vitamin B12",
+                           "Vitamin A, RAE" = "Vitamin A"))
+
+dta = uncert_run %>% 
+  group_by(nutrient) %>% 
+  summarise(pop_max = max(ndeficient_diff),
+            pop_mean = max(ndeficient_diff[buffer == 10]),
+            pop_min = min(ndeficient_diff))
+
+impacted_pop <- read_csv("Outputs/impacted_pop_SEV_bayes.csv") %>%
+  mutate(region = countrycode(iso3, 'iso3c', 'region'),
+         region = recode(region, "East Asia & Pacific" = "Southeast Asia & Pacific")) %>% 
+  group_by(region, buffer) %>% 
+  summarise(ndeficient_diff = sum(ndeficient_diff, na.rm=T)/1000000) %>% 
+  spread(buffer, ndeficient_diff)
+
+impacted_pop_vulnerable <- read_csv("Outputs/impacted_pop_SEV_bayes.csv") %>%
+  left_join(sevs) %>% 
+  filter(intake>25) %>% 
+  group_by(buffer, is_vulnerable) %>% 
+  summarise(ndeficient_diff = sum(ndeficient_diff, na.rm=T)/1000000) %>% 
+  spread(buffer, ndeficient_diff) %>% 
+  rename(pop_min = `30`,
+         pop_max = `5`,
+         pop_mean = `10`) %>% 
+  select(is_vulnerable, pop_max, pop_mean, pop_min)
+
+impacted_pop_all = uncert_run %>% 
+  group_by(run_n, buffer) %>% 
+  summarise(ndeficient_diff = sum(ndeficient_diff)) %>% 
+  mutate(is_vulnerable = "All countries") %>% 
+  group_by(is_vulnerable) %>% 
+  summarise(pop_max = max(ndeficient_diff),
+            pop_mean = max(ndeficient_diff[buffer==10]),
+            pop_min = min(ndeficient_diff))
+
+dta_pop = rbind(impacted_pop_vulnerable, impacted_pop_all)
+
+dta_pop$is_vulnerable = factor(dta_pop$is_vulnerable, levels = c("Nutritionally vulnerable",
+                                                                 "All countries"))
+base_theme2 = theme(axis.title = element_text(size = 13),
+                    axis.text = element_text(size = 13),
+                    legend.text = element_text(size = 17),
+                    legend.title = element_text(size = 17),
+                    legend.text.align = 0)
+
+##PLots
+p1 = ggplot(data = dta, aes(x = pop_mean, y = nutrient)) +
+  geom_pointrange(aes(xmin = pop_min, xmax = pop_max), size = 1.3, position = position_dodge(0.5)) +
+  #guides(color=guide_legend(override.aes=list(color=NA))) +
+  #xlim(0.25, 1) +
+  #ylim(0, 80) +
+  labs(y = "", x = "Reduction of inadequate intake\n(millions of people)") +
+  theme_bw() + base_theme2 +
+  theme(plot.margin = ggplot2::margin(t = 0,r = 0.5,b = 0 ,l = 2.95, "cm"))
+
+##By region
+
+p2 = ggplot(data = impacted_pop, aes(x = `10`, y = region)) +
+  geom_pointrange(aes(xmin = `5`, xmax = `30`), size = 1.3, position = position_dodge(0.5)) +
+  #guides(color=guide_legend(override.aes=list(color=NA))) +
+  #xlim(0.25, 1) +
+  #ylim(0, 80) +
+  scale_color_manual(values = c("orange", "grey"), labels = c("   \nCountries with\nhigh inadequate\nintake (>25%)\n   ", "   \nCountries with\nlow inadequate\nintake (<25%)\n   "))+
+  labs(y = "", x = "", colour = "Nutritional\nintake") +
+  theme_bw() + base_theme2 +
+  theme(plot.margin = ggplot2::margin(t = 0,r = 0.5,b = 0,l = 0, "cm"))
+
+
+p3 = ggplot(data = dta_pop, aes(x = pop_mean, y = is_vulnerable)) +
+  geom_pointrange(aes(xmin = pop_min, xmax = pop_max), size = 1.3, position = position_dodge(0.5)) +
+  #guides(color=guide_legend(override.aes=list(color=NA))) +
+  #xlim(0.25, 1) +
+  #ylim(0, 80) +
+  labs(x = "", y = "") +
+  theme_bw() + base_theme2 +
+  theme(plot.margin = ggplot2::margin(t = 0.8,r = 0.5,b = 0 ,l = 0.85, "cm"))
+
+p = ggarrange(p3, p2, p1, 
+              ncol=1, 
+              nrow=3,
+              #widths = c(0.3, 2), 
+              heights = c(1.5,2,2))
+
+p
+
+
+p.final2 = ggarrange(p,g,  
+                     ncol=2, 
+                     nrow=1,
+                     widths = c(1, 2), 
+                     heights = c(2,2), 
+                     labels = c("A", "B"), 
+                     font.label = list(size = 20, color = "black", face = "bold"))
+
+#p.final2
+
+ggsave(p.final2, filename = "Manuscript figures/Fig 4.jpeg", 
        height = 6.2, 
-       width = 10)
+       width = 14)
+# Export
+ggsave(p.final2, filename = "Manuscript figures/Fig 4.pdf", 
+       width=14, height=6.2, units="in", dpi=600, device=cairo_pdf)

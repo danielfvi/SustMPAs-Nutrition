@@ -1,7 +1,7 @@
 ####MPA and Nutrition Project
-####Figure 2
+####Figure 3
 ####Author: Daniel Viana
-####Date: June 2021
+####Date: June 2023
 
 library(tidyverse) 
 library(gdata)
@@ -325,9 +325,9 @@ g <- gridExtra::grid.arrange(plot1, plot2,
                              ncol=2)
 
 # Export
-ggsave(g, filename = "Figures/All_maps_brms.pdf", 
+ggsave(g, filename = "Manuscript figures/Fig 3.pdf", 
        width=10, height=6.2, units="in", dpi=600, device=cairo_pdf)
 
-ggsave(g, filename = "Figures/All_maps_brms.jpeg", 
+ggsave(g, filename = "Manuscript figures/Fig 3.jpeg", 
        width=9, height=6)
 
